@@ -17,7 +17,7 @@ dotenv.config();
 
 const app = express();
 
-  // GLOBAL MIDDLEWARES
+// GLOBAL MIDDLEWARES
 app.use(express.json());
 app.use(cookieParser());
 
@@ -38,7 +38,7 @@ app.use(
 );
 
 
-  // CLOUDINARY CONFIG
+// CLOUDINARY CONFIG
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -47,7 +47,7 @@ cloudinary.config({
 });
 
 
-  // DATABASE CONNECTION
+// DATABASE CONNECTION
 
 const PORT = process.env.PORT || 5000;
 const DB_URI = process.env.MONGO_URI;
@@ -61,19 +61,23 @@ mongoose
     console.error("MongoDB connection failed:", error.message);
   });
 
-  // ROUTES
+// ROUTES
 
 app.get("/", (req, res) => {
   res.send("Online Classroom backend is running successfully");
 });
 
 app.use("/api/v1/course", courseRoute);
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API working fine 🚀" });
+});
+
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/admin", adminRoute);
 app.use("/api/v1/order", orderRoute);
 
 
-  // SERVER START
+// SERVER START
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
