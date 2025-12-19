@@ -1,14 +1,25 @@
 import mongoose from "mongoose";
 
-const pruchaseSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Types.ObjectId,
-    ref: "User",
+const purchaseSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    courseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: true,
+    },
+    purchasedBy: {
+      type: String,
+      default: "Priyanshu Sagar",
+    },
   },
-  courseId: {
-    type: mongoose.Types.ObjectId,
-    ref: "Course",
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
-export const Purchase = mongoose.model("Purchase", pruchaseSchema);
+export const Purchase = mongoose.model("Purchase", purchaseSchema);

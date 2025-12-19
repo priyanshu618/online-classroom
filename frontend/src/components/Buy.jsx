@@ -1,217 +1,214 @@
+import { useEffect, useState } from "react";
 import axios from "axios";
-import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
+
 import { BACKEND_URL } from "../utils/utils";
+
 function Buy() {
   const { courseId } = useParams();
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  const [course, setCourse] = useState({});
-  const [clientSecret, setClientSecret] = useState("");
-  const [error, setError] = useState("");
-
-  const user = JSON.parse(localStorage.getItem("user"));
-  const token = user?.token;  //using optional chaining to avoid crashing incase token is not there!!!
 
   const stripe = useStripe();
   const elements = useElements();
+
+  const [course, setCourse] = useState({});
+  const [clientSecret, setClientSecret] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [cardError, setCardError] = useState("");
 
-  if (!token) {
-    navigate("/login");
-  }
+  const user = JSON.parse(localStorage.getItem("user"));
+  const token = user?.token;
 
+  // redirect if not logged in
+  useEffect(() => {
+    if (!token) {
+      navigate("/login");
+    }
+  }, [token, navigate]);
+
+  // fetch payment intent + course
   useEffect(() => {
     const fetchBuyCourseData = async () => {
       try {
-        const response = await axios.post(
+        setLoading(true);
+        const res = await axios.post(
           `${BACKEND_URL}/course/buy/${courseId}`,
           {},
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
-            withCredentials: true, // Include cookies if needed
+            withCredentials: true,
           }
         );
-        console.log(response.data);
-        setCourse(response.data.course);
-        setClientSecret(response.data.clientSecret);
-        setLoading(false);
+
+        setCourse(res.data.course);
+        setClientSecret(res.data.clientSecret);
       } catch (error) {
-        setLoading(false);
         if (error?.response?.status === 400) {
-          setError("you have already purchased this course");
+          setError("You have already purchased this course");
           navigate("/purchases");
         } else {
-          setError(error?.response?.data?.errors);
+          setError(error?.response?.data?.errors || "Something went wrong");
         }
+      } finally {
+        setLoading(false);
       }
     };
-    fetchBuyCourseData();
-  }, [courseId]);
 
-  const handlePurchase = async (event) => {
-    event.preventDefault();
+    if (token) fetchBuyCourseData();
+  }, [courseId, token, navigate]);
 
-    if (!stripe || !elements) {
-      console.log("Stripe or Element not found");
-      return;
-    }
+  const handlePurchase = async (e) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) return;
 
     setLoading(true);
-    const card = elements.getElement(CardElement);
+    setCardError("");
 
-    if (card == null) {
-      console.log("Cardelement not found");
+    const card = elements.getElement(CardElement);
+    if (!card) {
       setLoading(false);
       return;
     }
 
-    // Use your card Element with other Stripe.js APIs
-    const { error, paymentMethod } = await stripe.createPaymentMethod({
+    const { error: methodError } = await stripe.createPaymentMethod({
       type: "card",
       card,
     });
 
-    if (error) {
-      console.log("Stripe PaymentMethod Error: ", error);
-      setLoading(false);
-      setCardError(error.message);
-    } else {
-      console.log("[PaymentMethod Created]", paymentMethod);
-    }
-    if (!clientSecret) {
-      console.log("No client secret found");
+    if (methodError) {
+      setCardError(methodError.message);
       setLoading(false);
       return;
     }
+
     const { paymentIntent, error: confirmError } =
       await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
-          card: card,
+          card,
           billing_details: {
             name: user?.user?.firstName,
             email: user?.user?.email,
           },
         },
       });
+
     if (confirmError) {
       setCardError(confirmError.message);
-    } else if (paymentIntent.status === "succeeded") {
-      console.log("Payment succeeded: ", paymentIntent);
-      setCardError("your payment id: ", paymentIntent.id);
+      setLoading(false);
+      return;
+    }
+
+    if (paymentIntent.status === "succeeded") {
       const paymentInfo = {
         email: user?.user?.email,
-        userId: user.user._id,
-        courseId: courseId,
+        userId: user?.user?._id,
+        courseId,
         paymentId: paymentIntent.id,
         amount: paymentIntent.amount,
         status: paymentIntent.status,
       };
-      console.log("Payment info: ", paymentInfo);
-      await axios
-        .post(`${BACKEND_URL}/order`, paymentInfo, {
+
+      try {
+        await axios.post(`${BACKEND_URL}/order`, paymentInfo, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
           withCredentials: true,
-        })
-        .then((response) => {
-          console.log(response.data);
-        })
-        .catch((error) => {
-          console.log(error);
-          toast.error("Error in making payment");
         });
-      toast.success("Payment Successful");
-      navigate("/purchases");
+
+        toast.success("Payment successful");
+        navigate("/purchases");
+      } catch {
+        toast.error("Error saving payment");
+      }
     }
+
     setLoading(false);
   };
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="bg-red-100 text-red-700 px-6 py-4 rounded-lg text-center">
+          <p className="font-semibold mb-4">{error}</p>
+          <Link
+            to="/purchases"
+            className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition"
+          >
+            Go to Purchases
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      {error ? (
-        <div className="flex justify-center items-center h-screen">
-          <div className="bg-red-100 text-red-700 px-6 py-4 rounded-lg">
-            <p className="text-lg font-semibold">{error}</p>
-            <Link
-              className="w-full bg-orange-500 text-white py-2 rounded-md hover:bg-orange-600 transition duration-200 mt-3 flex items-center justify-center"
-              to={"/purchases"}
+    <div className="container mx-auto my-32 px-4 flex flex-col md:flex-row gap-10">
+      {/* Order Details */}
+      <div className="md:w-1/2">
+        <h1 className="text-xl font-semibold underline mb-4">
+          Order Details
+        </h1>
+        <p className="text-gray-600">
+          Course: <span className="font-bold">{course.title}</span>
+        </p>
+        <p className="text-gray-600 mt-2">
+          Total Price:{" "}
+          <span className="text-red-500 font-bold">
+            ${course.price}
+          </span>
+        </p>
+      </div>
+
+      {/* Payment */}
+      <div className="md:w-1/2 flex justify-center">
+        <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-sm">
+          <h2 className="text-lg font-semibold mb-4">
+            Complete Payment
+          </h2>
+
+          <form onSubmit={handlePurchase}>
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: "16px",
+                    color: "#424770",
+                    "::placeholder": { color: "#aab7c4" },
+                  },
+                  invalid: { color: "#9e2146" },
+                },
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={!stripe || loading}
+              className="mt-6 w-full bg-indigo-500 text-white py-2 rounded hover:bg-indigo-600 transition"
             >
-              Purchases
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row my-40 container mx-auto">
-          <div className="w-full md:w-1/2">
-            <h1 className="text-xl font-semibold underline">Order Details</h1>
-            <div className="flex items-center text-center space-x-2 mt-4">
-              <h2 className="text-gray-600 text-sm">Total Price</h2>
-              <p className="text-red-500 font-bold">${course.price}</p>
-            </div>
-            <div className="flex items-center text-center space-x-2">
-              <h1 className="text-gray-600 text-sm">Course name</h1>
-              <p className="text-red-500 font-bold">{course.title}</p>
-            </div>
-          </div>
-          <div className="w-full md:w-1/2 flex justify-center items-center">
-            <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-sm">
-              <h2 className="text-lg font-semibold mb-4">
-                Process your Payment!
-              </h2>
-              <div className="mb-4">
-                <label
-                  className="block text-gray-700 text-sm mb-2"
-                  htmlFor="card-number"
-                >
-                  Credit/Debit Card
-                </label>
-                <form onSubmit={handlePurchase}>
-                  <CardElement
-                    options={{
-                      style: {
-                        base: {
-                          fontSize: "16px",
-                          color: "#424770",
-                          "::placeholder": {
-                            color: "#aab7c4",
-                          },
-                        },
-                        invalid: {
-                          color: "#9e2146",
-                        },
-                      },
-                    }}
-                  />
+              {loading ? "Processing..." : "Pay"}
+            </button>
+          </form>
 
-                  <button
-                    type="submit"
-                    disabled={!stripe || loading} // Disable button when loading
-                    className="mt-8 w-full bg-indigo-500 text-white py-2 rounded-md hover:bg-indigo-600 transition duration-200"
-                  >
-                    {loading ? "Processing..." : "Pay"}
-                  </button>
-                </form>
-                {cardError && (
-                  <p className="text-red-500 font-semibold text-xs">
-                    {cardError}
-                  </p>
-                )}
-              </div>
+          {cardError && (
+            <p className="text-red-500 text-sm mt-3">{cardError}</p>
+          )}
 
-              <button className="w-full bg-orange-500 text-white py-2 rounded-md hover:bg-orange-600 transition duration-200 mt-3 flex items-center justify-center">
-                <span className="mr-2">🅿️</span> Other Payments Method
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            className="mt-4 w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 transition"
+          >
+            Other Payment Methods
+          </button>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 

@@ -1,119 +1,147 @@
-import axios from "axios";
-import React, { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 import { BACKEND_URL } from "../utils/utils";
 
 function OurCourses() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const navigate = useNavigate();
 
   const admin = JSON.parse(localStorage.getItem("admin"));
-  const token = admin.token;
+  const token = admin?.token;
 
-  if (!token) {
-    toast.error("Please login to admin");
-    navigate("/admin/login");
-  }
-
-  // fetch courses
+  // ---------------- AUTH CHECK ----------------
   useEffect(() => {
+    if (!token) {
+      toast.error("Please login as admin");
+      navigate("/admin/login");
+    }
+  }, [token, navigate]);
+
+  // ---------------- FETCH COURSES ----------------
+  useEffect(() => {
+    if (!token) return;
+
     const fetchCourses = async () => {
       try {
-        const response = await axios.get(`${BACKEND_URL}/course/courses`, {
-          withCredentials: true,
-        });
-        console.log(response.data.courses);
-        setCourses(response.data.courses);
-        setLoading(false);
+        const res = await axios.get(
+          `${BACKEND_URL}/course/courses`,
+          { withCredentials: true }
+        );
+        setCourses(res.data.courses || []);
       } catch (error) {
-        console.log("error in fetchCourses ", error);
+        toast.error("Failed to load courses");
+      } finally {
+        setLoading(false);
       }
     };
-    fetchCourses();
-  }, []);
 
-  // delete courses code
+    fetchCourses();
+  }, [token]);
+
+  // ---------------- DELETE COURSE ----------------
   const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this course?")) return;
+
     try {
-      const response = await axios.delete(
+      const res = await axios.delete(
         `${BACKEND_URL}/course/delete/${id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         }
       );
-      toast.success(response.data.message);
-      const updatedCourses = courses.filter((course) => course._id !== id);
-      setCourses(updatedCourses);
+
+      toast.success(res.data.message);
+      setCourses((prev) => prev.filter((c) => c._id !== id));
     } catch (error) {
-      console.log("Error in deleting course ", error);
-      toast.error(error.response.data.errors || "Error in deleting course");
+      toast.error(
+        error?.response?.data?.errors || "Failed to delete course"
+      );
     }
   };
 
+  // ---------------- LOADING ----------------
   if (loading) {
-    return <p className="text-center text-gray-500">Loading...</p>;
+    return (
+      <p className="text-center mt-20 text-gray-500">
+        Loading courses...
+      </p>
+    );
   }
 
+  // ---------------- UI ----------------
   return (
-    <div className="bg-gray-100 p-8 space-y-4">
-      <h1 className="text-3xl font-bold text-center mb-8">Our Courses</h1>
-      <Link
-        className="bg-orange-400 py-2 px-4 rounded-lg text-white hover:bg-orange-950 duration-300"
-        to={"/admin/dashboard"}
-      >
-        Go to dashboard
-      </Link>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {courses.map((course) => (
-          <div key={course._id} className="bg-white shadow-md rounded-lg p-4">
-            {/* Course Image */}
-            <img
-              src={course?.image?.url}
-              alt={course.title}
-              className="h-40 w-full object-cover rounded-t-lg"
-            />
-            {/* Course Title */}
-            <h2 className="text-xl font-semibold mt-4 text-gray-800">
-              {course.title}
-            </h2>
-            {/* Course Description */}
-            <p className="text-gray-600 mt-2 text-sm">
-              {course.description.length > 200
-                ? `${course.description.slice(0, 200)}...`
-                : course.description}
-            </p>
-            {/* Course Price */}
-            <div className="flex justify-between mt-4 text-gray-800 font-bold">
-              <div>
-                {" "}
-                ₹{course.price}{" "}
-                <span className="line-through text-gray-500">₹300</span>
-              </div>
-              <div className="text-green-600 text-sm mt-2">10 % off</div>
-            </div>
+    <div className="bg-gray-100 min-h-screen p-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Our Courses</h1>
 
-            <div className="flex justify-between">
-              <Link
-                to={`/admin/update-course/${course._id}`}
-                className="bg-orange-500 text-white py-2 px-4 mt-4 rounded hover:bg-blue-600"
-              >
-                Update
-              </Link>
-              <button
-                onClick={() => handleDelete(course._id)}
-                className="bg-red-500 text-white py-2 px-4 mt-4 rounded hover:bg-red-600"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
+        <Link
+          to="/admin/dashboard"
+          className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition"
+        >
+          Back to Dashboard
+        </Link>
       </div>
+
+      {courses.length === 0 ? (
+        <p className="text-gray-500">No courses created yet.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course) => (
+            <div
+              key={course._id}
+              className="bg-white shadow-md rounded-lg overflow-hidden"
+            >
+              <img
+                src={course.image?.url}
+                alt={course.title}
+                className="h-44 w-full object-cover"
+              />
+
+              <div className="p-4">
+                <h2 className="text-xl font-semibold mb-2">
+                  {course.title}
+                </h2>
+
+                <p className="text-gray-600 text-sm mb-4">
+                  {course.description.length > 150
+                    ? `${course.description.slice(0, 150)}...`
+                    : course.description}
+                </p>
+
+                <div className="flex justify-between items-center mb-4">
+                  <span className="font-bold text-lg">
+                    ₹{course.price}
+                  </span>
+                  <span className="text-green-600 text-sm">
+                    Active
+                  </span>
+                </div>
+
+                <div className="flex justify-between gap-3">
+                  <Link
+                    to={`/admin/update-course/${course._id}`}
+                    className="flex-1 text-center bg-orange-500 text-white py-2 rounded hover:bg-blue-600 transition"
+                  >
+                    Update
+                  </Link>
+
+                  <button
+                    onClick={() => handleDelete(course._id)}
+                    className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

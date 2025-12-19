@@ -1,188 +1,158 @@
-
+import { useEffect, useState } from "react";
 import axios from "axios";
-import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
+
 import { FaDiscourse, FaDownload } from "react-icons/fa";
 import { IoMdSettings } from "react-icons/io";
 import { IoLogIn, IoLogOut } from "react-icons/io5";
 import { RiHome2Fill } from "react-icons/ri";
-import { HiMenu, HiX } from "react-icons/hi"; // Icons for sidebar toggle
-import { Link, useNavigate } from "react-router-dom";
+import { HiMenu, HiX } from "react-icons/hi";
+
 import { BACKEND_URL } from "../utils/utils";
 
 function Purchases() {
-  const [purchases, setPurchase] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar open state
 
   const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem("user"));
-  const token = user?.token; // using optional chaining to avoid app crashing
+  const user = JSON.parse(localStorage.getItem("user"));
+  const token = user?.token;
 
-  console.log("purchases: ", purchases);
-
-  // Token handling
+  // auth check
   useEffect(() => {
- 
-    if (token) {
-      setIsLoggedIn(true);
+    if (!token) {
+      navigate("/login");
     } else {
-      setIsLoggedIn(false);
+      setIsLoggedIn(true);
     }
-  }, []);
+  }, [token, navigate]);
 
-  if (!token) {
-    navigate("/login");
-  }
-
-  // Fetch purchases
+  // fetch purchases
   useEffect(() => {
     const fetchPurchases = async () => {
       try {
-        const response = await axios.get(`${BACKEND_URL}/user/purchases`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const res = await axios.get(`${BACKEND_URL}/user/purchases`, {
+          headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });
-        setPurchase(response.data.courseData);
-      } catch (error) {
+        setPurchases(res.data.courseData || []);
+      } catch {
         setErrorMessage("Failed to fetch purchase data");
       }
     };
-    fetchPurchases();
-  }, []);
 
-  // Logout
+    if (token) fetchPurchases();
+  }, [token]);
+
+  // logout
   const handleLogout = async () => {
     try {
-      const response = await axios.get(`${BACKEND_URL}/user/logout`, {
+      const res = await axios.get(`${BACKEND_URL}/user/logout`, {
         withCredentials: true,
       });
-      toast.success(response.data.message);
+      toast.success(res.data.message);
       localStorage.removeItem("user");
       navigate("/login");
-      setIsLoggedIn(false);
-    } catch (error) {
-      console.log("Error in logging out ", error);
-      toast.error(error.response.data.errors || "Error in logging out");
+    } catch {
+      toast.error("Logout failed");
     }
   };
 
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   return (
-    <div className="flex h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 bg-gray-100 p-5 transform ${
+      <aside
+        className={`fixed md:static z-20 h-screen w-64 bg-white border-r p-6 transition-transform duration-300 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 transition-transform duration-300 ease-in-out w-64 z-50`}
+        } md:translate-x-0`}
       >
-        <nav>
-          <ul className="mt-16 md:mt-0">
-            <li className="mb-4">
-              <Link to="/" className="flex items-center">
-                <RiHome2Fill className="mr-2" /> Home
-              </Link>
-            </li>
-            <li className="mb-4">
-              <Link to="/courses" className="flex items-center">
-                <FaDiscourse className="mr-2" /> Courses
-              </Link>
-            </li>
-            <li className="mb-4">
-              <a href="#" className="flex items-center text-blue-500">
-                <FaDownload className="mr-2" /> Purchases
-              </a>
-            </li>
-            <li className="mb-4">
-              <Link to="/settings" className="flex items-center">
-                <IoMdSettings className="mr-2" /> Settings
+        <nav className="mt-12 md:mt-0">
+          <ul className="space-y-4">
+            <li>
+              <Link to="/" className="flex items-center gap-2">
+                <RiHome2Fill /> Home
               </Link>
             </li>
             <li>
+              <Link to="/courses" className="flex items-center gap-2">
+                <FaDiscourse /> Courses
+              </Link>
+            </li>
+            <li className="text-blue-600">
+              <FaDownload className="inline mr-2" /> Purchases
+            </li>
+            <li>
+              <IoMdSettings className="inline mr-2" /> Settings
+            </li>
+            <li>
               {isLoggedIn ? (
-                <button onClick={handleLogout} className="flex items-center">
-                  <IoLogOut className="mr-2" /> Logout
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-red-600"
+                >
+                  <IoLogOut /> Logout
                 </button>
               ) : (
-                <Link to="/login" className="flex items-center">
-                  <IoLogIn className="mr-2" /> Login
+                <Link to="/login" className="flex items-center gap-2">
+                  <IoLogIn /> Login
                 </Link>
               )}
             </li>
           </ul>
         </nav>
-      </div>
+      </aside>
 
-      {/* Sidebar Toggle Button (Mobile) */}
+      {/* Mobile toggle */}
       <button
-        className="fixed top-4 left-4 z-50 md:hidden bg-blue-600 text-white p-2 rounded-lg"
-        onClick={toggleSidebar}
+        className="fixed top-4 left-4 z-30 md:hidden bg-blue-600 text-white p-2 rounded"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
-        {isSidebarOpen ? (
-          <HiX className="text-2xl" />
-        ) : (
-          <HiMenu className="text-2xl" />
-        )}
+        {isSidebarOpen ? <HiX /> : <HiMenu />}
       </button>
 
-      {/* Main Content */}
-      <div
-        className={`flex-1 p-8 bg-gray-50 transition-all duration-300 ${
-          isSidebarOpen ? "ml-64" : "ml-0"
-        } md:ml-64`}
-      >
-        <h2 className="text-xl font-semibold mt-6 md:mt-0 mb-6">
-          My Purchases
-        </h2>
+      {/* Main */}
+      <main className="flex-1 p-8 md:ml-64">
+        <h2 className="text-2xl font-semibold mb-6">My Purchases</h2>
 
-        {/* Error message */}
         {errorMessage && (
-          <div className="text-red-500 text-center mb-4">{errorMessage}</div>
+          <p className="text-red-500 mb-6 text-center">{errorMessage}</p>
         )}
 
-        {/* Render purchases */}
-        {purchases.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {purchases.map((purchase, index) => (
+        {purchases.length === 0 ? (
+          <p className="text-gray-500">You have no purchases yet.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {purchases.map((course) => (
               <div
-                key={index}
-                className="bg-white rounded-lg shadow-md p-6 mb-6"
+                key={course._id}
+                className="bg-white rounded-lg shadow hover:shadow-md transition"
               >
-                <div className="flex flex-col items-center space-y-4">
-                  {/* Course Image */}
-                  <img
-                    className="rounded-lg w-full h-48 object-cover"
-                    src={
-                      purchase.image?.url || "https://via.placeholder.com/200"
-                    }
-                    alt={purchase.title}
-                  />
-                  <div className="text-center">
-                    <h3 className="text-lg font-bold">{purchase.title}</h3>
-                    <p className="text-gray-500">
-                      {purchase.description.length > 100
-                        ? `${purchase.description.slice(0, 100)}...`
-                        : purchase.description}
-                    </p>
-                    <span className="text-green-700 font-semibold text-sm">
-                      ${purchase.price} only
-                    </span>
-                  </div>
+                <img
+                  src={course.image?.url}
+                  alt={course.title}
+                  className="h-44 w-full object-cover rounded-t-lg"
+                />
+                <div className="p-4 text-center">
+                  <h3 className="font-semibold text-lg mb-2">
+                    {course.title}
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-3">
+                    {course.description.length > 100
+                      ? course.description.slice(0, 100) + "..."
+                      : course.description}
+                  </p>
+                  <span className="text-green-700 font-semibold">
+                    ${course.price}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <p className="text-gray-500">You have no purchases yet.</p>
         )}
-      </div>
+      </main>
     </div>
   );
 }

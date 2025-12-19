@@ -1,127 +1,115 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+import toast from "react-hot-toast";
+import { Link } from "react-router-dom";
 
-import React, { useState, useEffect } from "react";
-import axios from "axios"; // Import axios for API call
-import { FaCircleUser } from "react-icons/fa6";
+import {
+  FaCircleUser,
+  FaDownload,
+  FaDiscourse,
+} from "react-icons/fa6";
 import { RiHome2Fill } from "react-icons/ri";
-import { FaDiscourse } from "react-icons/fa";
-import { FaDownload } from "react-icons/fa6";
 import { IoMdSettings } from "react-icons/io";
 import { IoLogIn, IoLogOut } from "react-icons/io5";
 import { FiSearch } from "react-icons/fi";
-import { HiMenu, HiX } from "react-icons/hi"; // Import menu and close icons
+import { HiMenu, HiX } from "react-icons/hi";
+
 import logo from "../../public/logo.webp";
-import toast from "react-hot-toast";
-import { Link, useNavigate } from "react-router-dom";
 import { BACKEND_URL } from "../utils/utils";
 
 function Courses() {
   const [courses, setCourses] = useState([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State to toggle sidebar
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  console.log("courses: ", courses);
-
-  // Check token
+  // check login
   useEffect(() => {
-    const token = localStorage.getItem("user");
-    if (token) {
-      setIsLoggedIn(true);
-    } else {
-      setIsLoggedIn(false);
-    }
+    setIsLoggedIn(!!localStorage.getItem("user"));
   }, []);
 
-  // Fetch courses
+  // fetch courses
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await axios.get(`${BACKEND_URL}/course/courses`, {
-          withCredentials: true,
-        });
-        console.log(response.data.courses);
-        setCourses(response.data.courses);
-        setLoading(false);
+        const res = await axios.get(
+          `${BACKEND_URL}/course/courses`,
+          { withCredentials: true }
+        );
+        setCourses(res.data.courses || []);
       } catch (error) {
-        console.log("error in fetchCourses ", error);
+        console.error(error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchCourses();
   }, []);
 
-  // Logout
+  // logout
   const handleLogout = async () => {
     try {
-      const response = await axios.get(`${BACKEND_URL}/user/logout`, {
+      const res = await axios.get(`${BACKEND_URL}/user/logout`, {
         withCredentials: true,
       });
-      toast.success(response.data.message);
+      toast.success(res.data.message);
       localStorage.removeItem("user");
       setIsLoggedIn(false);
-    } catch (error) {
-      console.log("Error in logging out ", error);
-      toast.error(error.response.data.errors || "Error in logging out");
+    } catch {
+      toast.error("Logout failed");
     }
   };
 
-  // Toggle sidebar for mobile devices
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   return (
-    <div className="flex">
-      {/* Hamburger menu button for mobile */}
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Mobile Menu Button */}
       <button
-        className="md:hidden fixed top-4 left-4 z-20 text-3xl text-gray-800"
-        onClick={toggleSidebar}
+        className="md:hidden fixed top-4 left-4 z-20 text-3xl"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
-        {isSidebarOpen ? <HiX /> : <HiMenu />} {/* Toggle menu icon */}
+        {isSidebarOpen ? <HiX /> : <HiMenu />}
       </button>
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen bg-gray-100 w-64 p-5 transform z-10 transition-transform duration-300 ease-in-out ${
+        className={`fixed md:static top-0 left-0 z-10 h-screen w-64 bg-white border-r p-6 transition-transform duration-300 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 md:static`}
+        } md:translate-x-0`}
       >
-        <div className="flex items-center mb-10 mt-10 md:mt-0">
-          <img src={logo} alt="Profile" className="rounded-full h-12 w-12" />
+        <div className="flex items-center gap-2 mb-10 mt-8 md:mt-0">
+          <img src={logo} alt="logo" className="h-10 w-10 rounded-full" />
+          <h2 className="font-bold text-lg">Online Classroom</h2>
         </div>
+
         <nav>
-          <ul>
-            <li className="mb-4">
-              <a href="/" className="flex items-center">
-                <RiHome2Fill className="mr-2" /> Home
-              </a>
+          <ul className="space-y-4">
+            <li>
+              <Link to="/" className="flex items-center gap-2">
+                <RiHome2Fill /> Home
+              </Link>
             </li>
-            <li className="mb-4">
-              <a href="#" className="flex items-center text-blue-500">
-                <FaDiscourse className="mr-2" /> Courses
-              </a>
+            <li className="text-blue-600">
+              <FaDiscourse className="inline mr-2" /> Courses
             </li>
-            <li className="mb-4">
-              <a href="/purchases" className="flex items-center">
-                <FaDownload className="mr-2" /> Purchases
-              </a>
+            <li>
+              <Link to="/purchases" className="flex items-center gap-2">
+                <FaDownload /> Purchases
+              </Link>
             </li>
-            <li className="mb-4">
-              <a href="#" className="flex items-center">
-                <IoMdSettings className="mr-2" /> Settings
-              </a>
+            <li>
+              <IoMdSettings className="inline mr-2" /> Settings
             </li>
             <li>
               {isLoggedIn ? (
-                <Link to={"/"}
-                  
-                  className="flex items-center"
+                <button
                   onClick={handleLogout}
+                  className="flex items-center gap-2 text-red-600"
                 >
-                  <IoLogOut className="mr-2" /> Logout
-                </Link>
+                  <IoLogOut /> Logout
+                </button>
               ) : (
-                <Link to={"/login"} className="flex items-center">
-                  <IoLogIn className="mr-2" /> Login
+                <Link to="/login" className="flex items-center gap-2">
+                  <IoLogIn /> Login
                 </Link>
               )}
             </li>
@@ -129,73 +117,72 @@ function Courses() {
         </nav>
       </aside>
 
-      {/* Main content */}
-      <main className="ml-0 md:ml-64 w-full bg-white p-10">
-        <header className="flex justify-between items-center mb-10">
-          <h1 className="text-xl font-bold">Courses</h1>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center">
+      {/* Main Content */}
+      <main className="flex-1 p-8 md:ml-64">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">Courses</h1>
+
+          <div className="flex items-center gap-4">
+            <div className="flex">
               <input
-                type="text"
-                placeholder="Type here to search..."
-                className="border border-gray-300 rounded-l-full px-4 py-2 h-10 focus:outline-none"
+                placeholder="Search courses..."
+                className="border px-4 py-2 rounded-l-full outline-none"
               />
-              <button className="h-10 border border-gray-300 rounded-r-full px-4 flex items-center justify-center">
-                <FiSearch className="text-xl text-gray-600" />
+              <button className="border px-4 rounded-r-full">
+                <FiSearch />
               </button>
             </div>
-
-            <FaCircleUser className="text-4xl text-blue-600" />
+            <FaCircleUser className="text-3xl text-blue-600" />
           </div>
         </header>
 
-        {/* Vertically Scrollable Courses Section */}
-        <div className="overflow-y-auto h-[75vh]">
-          {loading ? (
-            <p className="text-center text-gray-500">Loading...</p>
-          ) : courses.length === 0 ? (
-            // Check if courses array is empty
-            <p className="text-center text-gray-500">
-              No course posted yet by admin
-            </p>
-          ) : (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {courses.map((course) => (
-                <div
-                  key={course._id}
-                  className="border border-gray-200 rounded-lg p-4 shadow-sm"
-                >
-                  <img
-                    src={course.image.url}
-                    alt={course.title}
-                    className="rounded mb-4"
-                  />
-                  <h2 className="font-bold text-lg mb-2">{course.title}</h2>
-                  <p className="text-gray-600 mb-4">
+        {/* Courses Grid */}
+        {loading ? (
+          <p className="text-center text-gray-500">Loading courses...</p>
+        ) : courses.length === 0 ? (
+          <p className="text-center text-gray-500">
+            No courses available right now.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {courses.map((course) => (
+              <div
+                key={course._id}
+                className="bg-white border rounded-lg shadow-sm hover:shadow-md transition"
+              >
+                <img
+                  src={course.image.url}
+                  alt={course.title}
+                  className="h-40 w-full object-cover rounded-t-lg"
+                />
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg mb-2">
+                    {course.title}
+                  </h3>
+
+                  <p className="text-gray-600 text-sm mb-4">
                     {course.description.length > 100
-                      ? `${course.description.slice(0, 100)}...`
+                      ? course.description.slice(0, 100) + "..."
                       : course.description}
                   </p>
+
                   <div className="flex justify-between items-center mb-4">
-                    <span className="font-bold text-xl">
-                      ₹{course.price}{" "}
-                      <span className="text-gray-500 line-through">5999</span>
-                    </span>
-                    <span className="text-green-600">20% off</span>
+                    <span className="font-bold text-xl">₹{course.price}</span>
+                    <span className="text-green-600 text-sm">Best value</span>
                   </div>
 
-                  {/* Buy page */}
                   <Link
-                    to={`/buy/${course._id}`} // Pass courseId in URL
-                    className="bg-orange-500 w-full text-white px-4 py-2 rounded-lg hover:bg-blue-900 duration-300"
+                    to={`/buy/${course._id}`}
+                    className="block text-center bg-orange-500 text-white py-2 rounded hover:bg-blue-700 transition"
                   >
                     Buy Now
                   </Link>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
